@@ -11,6 +11,7 @@ import (
 func TestSetupWritesCompatibleConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 
 	args := []string{
 		"--host", "school.example.edu",
