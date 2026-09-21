@@ -1,8 +1,10 @@
 version: 2
 
+project_name: d2l-mcp
+
 before:
   hooks:
-    - go mod tidy
+    - go mod verify
     - go test ./...
 
 builds:
@@ -18,13 +20,18 @@ builds:
     goarch:
       - amd64
       - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
     ldflags:
-      - -s -w
+      - >-
+        -s -w
+        -X github.com/RobertLMcCrary/D2L-MCP/internal/mcpserver.Version={{ .Version }}
 
 archives:
-  - formats: [tar.gz]
+  - name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
@@ -35,6 +42,9 @@ archives:
 
 checksum:
   name_template: checksums.txt
+
+release:
+  prerelease: auto
 
 changelog:
   sort: asc

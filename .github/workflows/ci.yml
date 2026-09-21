@@ -36,3 +36,20 @@ jobs:
           cache: true
       - run: go build -trimpath -o d2l-mcp ./cmd/d2l-mcp
       - run: D2L_MCP_TEST_BINARY="$PWD/d2l-mcp" go test ./internal/mcpserver -run TestStdioSubprocess -count=1
+
+  release-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean

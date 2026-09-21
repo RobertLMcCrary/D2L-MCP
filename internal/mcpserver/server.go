@@ -16,7 +16,7 @@ import (
 	"github.com/RobertLMcCrary/D2L-MCP/internal/guidance"
 )
 
-const Version = "0.1.0"
+var Version = "dev"
 
 type Meta struct {
 	FetchedAt string `json:"fetched_at"`
