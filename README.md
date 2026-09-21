@@ -1,70 +1,108 @@
 # D2L MCP
 
-A local stdio MCP server for read-only D2L Brightspace academic data, written in Go with [mark3labs/mcp-go](https://github.com/mark3labs/mcp-go).
+[![CI](https://github.com/RobertLMcCrary/D2L-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/RobertLMcCrary/D2L-MCP/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/RobertLMcCrary/D2L-MCP?include_prereleases&sort=semver)](https://github.com/RobertLMcCrary/D2L-MCP/releases)
+[![Go version](https://img.shields.io/github/go-mod/go-version/RobertLMcCrary/D2L-MCP)](go.mod)
+[![License](https://img.shields.io/github/license/RobertLMcCrary/D2L-MCP)](LICENSE)
 
-This project is a native Go adaptation of [Aaryan Kapoor’s `d2l-cli`](https://github.com/Aaryan-Kapoor/d2l-cli), currently targeting behavioral compatibility with [`d2l-cli` v0.2.2](https://github.com/Aaryan-Kapoor/d2l-cli/tree/v0.2.2). Aaryan designed and implemented the original CLI, endpoint coverage, authentication flow, course resolution, SimpleSyllabus integration, downloads, snapshot workflow, and agent guidance that made this port possible.
+A local [Model Context Protocol](https://modelcontextprotocol.io/) server for read-only D2L Brightspace academic data. It runs over stdio and is written in Go with [mark3labs/mcp-go](https://github.com/mark3labs/mcp-go).
 
-## What it provides
+> [!IMPORTANT]
+> D2L MCP is unofficial. It is not affiliated with or endorsed by D2L Corporation or any educational institution.
 
-- Courses, identity, grades, assignments, quizzes, discussions, announcements, calendar, due and overdue work, updates, and comprehensive snapshots
-- Course content browsing by root, table of contents, or module
-- Individual course-material downloads
-- Recursive module downloads for PDFs, slides, documents, media, and starter files
+## Features
+
+- Courses, identity, grades, assignments, quizzes, discussions, and announcements
+- Calendar, due and overdue work, recent updates, and course snapshots
+- Course-content browsing by root, table of contents, or module
+- Individual and recursive downloads for course materials
 - Assignment-attachment downloads
 - Public SimpleSyllabus retrieval
-- Browser-assisted Brightspace login with silent token refresh
-- Typed MCP inputs and structured outputs with text fallbacks
-- Embedded agent guidance resources and academic workflow prompts
+- Browser-assisted Brightspace login and silent token refresh
+- Typed MCP inputs, structured outputs, guidance resources, and workflow prompts
 
-Brightspace academic access is GET-only. Authentication performs a token-exchange POST inside the user’s authenticated browser session. Download tools write only to a managed local directory.
+Brightspace academic access is GET-only. Authentication performs a token-exchange POST inside the user's authenticated browser session. Downloads write only to a managed local directory.
 
-## Requirements
+## Project status
 
-- Go 1.25.5 or newer to build
-- Google Chrome, Chromium, or another Chrome-compatible executable discoverable by `chromedp`
-- A Brightspace account at a supported institution
+The project is pre-1.0 and currently targets behavioral compatibility with [`d2l-cli` v0.2.2](https://github.com/Aaryan-Kapoor/d2l-cli/tree/v0.2.2). Interfaces may change before v1.0, but tagged releases follow semantic versioning.
 
-## Build
+See [docs/PARITY.md](docs/PARITY.md) for the complete command mapping, deliberate MCP interface differences, and upstream source citations.
+
+## Install
+
+### Download a release
+
+Download the archive for your platform from [GitHub Releases](https://github.com/RobertLMcCrary/D2L-MCP/releases):
+
+- `darwin_arm64` for Apple silicon
+- `darwin_amd64` for Intel Macs
+- `linux_arm64` or `linux_amd64` for Linux
+- `windows_arm64` or `windows_amd64` for Windows
+
+Each release includes platform archives and `checksums.txt`. Verify the archive checksum, extract the binary, and place `d2l-mcp` (or `d2l-mcp.exe`) somewhere on `PATH`.
+
+Release binaries are not currently code-signed or notarized. Your operating system may require confirmation before first launch.
+
+### Build from source
+
+Building requires Go 1.25.5 or newer:
 
 ```sh
-go build -trimpath -o bin/d2l-mcp ./cmd/d2l-mcp
+git clone https://github.com/RobertLMcCrary/D2L-MCP.git
+cd D2L-MCP
+go build -trimpath -o d2l-mcp ./cmd/d2l-mcp
 ```
 
+Confirm the installation:
+
+```sh
+./d2l-mcp version
+./d2l-mcp --help
+```
+
+Source builds report `dev`; tagged release binaries report their release version. Move the built executable to a directory on `PATH` before continuing.
+
 ## Configure and authenticate
+
+Runtime requirements:
+
+- A Brightspace account
+- Google Chrome, Chromium, or another Chrome-compatible executable discoverable by `chromedp`
 
 Use a known school preset:
 
 ```sh
-bin/d2l-mcp setup --school ksu
-bin/d2l-mcp setup --school gsu
+d2l-mcp setup --school ksu
+d2l-mcp setup --school gsu
 ```
 
 Or configure any Brightspace host:
 
 ```sh
-bin/d2l-mcp setup \
+d2l-mcp setup \
   --host https://your-school.brightspace.example \
   --syllabus-host https://your-school.simplesyllabus.com
 ```
 
-Then authenticate and verify:
+Authenticate and verify the setup:
 
 ```sh
-bin/d2l-mcp login
-bin/d2l-mcp doctor
+d2l-mcp login
+d2l-mcp doctor
 ```
 
-Configuration remains compatible with `d2l-cli` under `~/.d2l/`:
+State remains compatible with `d2l-cli` under `~/.d2l/`:
 
 - `config.json`
 - `token.json`
 - `browser_profile/`
 
-Tokens and browser state are secrets. Do not commit or share them.
+Tokens and browser state are secrets. Never commit or share them.
 
 ## MCP client configuration
 
-Build the binary and use its absolute path:
+Configure your MCP client with the binary's absolute path:
 
 ```json
 {
@@ -79,7 +117,7 @@ Build the binary and use its absolute path:
 
 The server uses stdout exclusively for MCP JSON-RPC. Diagnostics and command errors go to stderr.
 
-## Tools
+## MCP tools
 
 Read-only query tools:
 
@@ -107,20 +145,18 @@ Local-writing download tools:
 
 Downloads default to `~/.d2l/downloads`. Set `D2L_DOWNLOAD_DIR` or `download_dir` in `config.json` to use another managed root. Existing files are never overwritten.
 
-See [docs/PARITY.md](docs/PARITY.md) for the complete `d2l-cli` command mapping, deliberate MCP interface differences, and source citations.
-
-## Security model
+## Security
 
 - Academic API calls are GET-only.
 - HTTPS Brightspace hosts are required.
 - Bearer credentials are not forwarded across host redirects.
-- Tokens are stored with mode `0600`; state directories use `0700`.
+- Tokens use mode `0600`; state directories use `0700` on supported systems.
 - Browser refresh is cancellable and serialized with a lock file.
-- API requests have deadlines, bounded pagination, and context-aware rate-limit retries.
-- Downloads are streamed with a 256 MiB per-file limit and reject traversal, symlink roots, and overwrites.
-- LMS text and files are exposed as untrusted data, not agent instructions.
+- Requests have deadlines, bounded pagination, and context-aware rate-limit retries.
+- Downloads have a 256 MiB per-file limit and reject traversal, symlink roots, and overwrites.
+- LMS text and files are treated as untrusted data, not agent instructions.
 
-See [SECURITY.md](SECURITY.md) for reporting and operational guidance.
+Read [SECURITY.md](SECURITY.md) before reporting a vulnerability or sharing diagnostics.
 
 ## Development
 
@@ -131,10 +167,23 @@ go vet ./...
 go test ./internal/d2l -run '^$' -fuzz FuzzSafeFilename -fuzztime=10s
 ```
 
-The test suite includes fixture-backed API behavior, pagination, retries, cancellation, auth-state compatibility, path security, in-process MCP negotiation, and a true stdio subprocess test.
+Validate the complete cross-platform release locally with [GoReleaser](https://goreleaser.com/):
 
-## Attribution and license
+```sh
+goreleaser check
+goreleaser release --snapshot --clean
+```
 
-This project and its upstream-derived portions are MIT licensed. The full original copyright and permission notice for `d2l-cli` is retained in [LICENSE](LICENSE), and detailed attribution appears in [NOTICE](NOTICE).
+The test suite covers fixture-backed API behavior, pagination, retries, cancellation, authentication-state compatibility, path security, in-process MCP negotiation, and a true stdio subprocess.
 
-This is an unofficial project. It is not affiliated with or endorsed by D2L Corporation or any educational institution.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for safety requirements, development checks, and fixture-sanitization rules.
+
+## Attribution
+
+D2L MCP is a native Go adaptation of [Aaryan Kapoor's `d2l-cli`](https://github.com/Aaryan-Kapoor/d2l-cli). Aaryan designed and implemented the original CLI, endpoint coverage, authentication flow, course resolution, SimpleSyllabus integration, downloads, snapshot workflow, and agent guidance that made this port possible.
+
+Detailed derivation and source citations are preserved in [NOTICE](NOTICE) and [docs/PARITY.md](docs/PARITY.md).
+
+## License
+
+D2L MCP and its upstream-derived portions are available under the [MIT License](LICENSE). The original `d2l-cli` copyright and permission notice are retained.
