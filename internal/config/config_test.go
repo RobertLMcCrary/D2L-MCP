@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -41,7 +42,7 @@ func TestSaveUsesPrivatePermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("mode is %o, want 600", info.Mode().Perm())
 	}
 }

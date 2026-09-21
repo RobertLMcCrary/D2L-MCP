@@ -6,8 +6,8 @@ import (
 	mcpclient "github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/robertmccrary/d2l-mcp/internal/app"
-	"github.com/robertmccrary/d2l-mcp/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/app"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
 )
 
 func initializedClient(t *testing.T) *mcpclient.Client {

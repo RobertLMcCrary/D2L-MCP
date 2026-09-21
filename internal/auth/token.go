@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/robertmccrary/d2l-mcp/internal/config"
-	"github.com/robertmccrary/d2l-mcp/internal/d2l"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/d2l"
 )
 
 const (

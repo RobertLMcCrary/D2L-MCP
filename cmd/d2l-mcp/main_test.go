@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/robertmccrary/d2l-mcp/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
 )
 
 func TestSetupWritesCompatibleConfig(t *testing.T) {

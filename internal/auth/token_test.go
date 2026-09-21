@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
-	"github.com/robertmccrary/d2l-mcp/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
 )
 
 func makeToken(t *testing.T, expires time.Time) string {
@@ -54,7 +55,7 @@ func TestValidateAndSaveToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("mode is %o, want 600", info.Mode().Perm())
 	}
 }

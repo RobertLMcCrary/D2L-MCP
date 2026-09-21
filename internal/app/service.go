@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/robertmccrary/d2l-mcp/internal/auth"
-	"github.com/robertmccrary/d2l-mcp/internal/config"
-	"github.com/robertmccrary/d2l-mcp/internal/d2l"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/auth"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/d2l"
 )
 
 type Service struct {

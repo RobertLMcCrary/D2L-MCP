@@ -1,4 +1,4 @@
-module github.com/robertmccrary/d2l-mcp
+module github.com/RobertLMcCrary/D2L-MCP
 
 go 1.25.5
 

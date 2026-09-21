@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/robertmccrary/d2l-mcp/internal/app"
-	"github.com/robertmccrary/d2l-mcp/internal/auth"
-	"github.com/robertmccrary/d2l-mcp/internal/config"
-	"github.com/robertmccrary/d2l-mcp/internal/mcpserver"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/app"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/auth"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/mcpserver"
 )
 
 type school struct {

@@ -11,9 +11,9 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	"github.com/robertmccrary/d2l-mcp/internal/app"
-	"github.com/robertmccrary/d2l-mcp/internal/d2l"
-	"github.com/robertmccrary/d2l-mcp/internal/guidance"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/app"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/d2l"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/guidance"
 )
 
 const Version = "0.1.0"
