@@ -1,0 +1,28 @@
+D2L MCP
+=======
+
+This project is a native Go MCP adaptation of d2l-cli v0.2.2:
+
+  d2l-cli
+  Copyright (c) 2026 Aaryan Kapoor
+  https://github.com/Aaryan-Kapoor/d2l-cli
+  Licensed under the MIT License.
+
+The Brightspace endpoint selection, course-resolution priority, browser token
+capture flow, SimpleSyllabus matching, content traversal, assignment matching,
+snapshot behavior, and bundled agent guidance were derived from or designed
+for behavioral compatibility with that project.
+
+Upstream source references:
+
+  https://github.com/Aaryan-Kapoor/d2l-cli/tree/v0.2.2/src/d2l
+  https://github.com/Aaryan-Kapoor/d2l-cli/blob/v0.2.2/src/d2l/client.py
+  https://github.com/Aaryan-Kapoor/d2l-cli/blob/v0.2.2/src/d2l/resolver.py
+  https://github.com/Aaryan-Kapoor/d2l-cli/blob/v0.2.2/src/d2l/commands/auth_cmd.py
+  https://github.com/Aaryan-Kapoor/d2l-cli/blob/v0.2.2/src/d2l/commands/download.py
+  https://github.com/Aaryan-Kapoor/d2l-cli/blob/v0.2.2/src/d2l/commands/syllabus.py
+  https://github.com/Aaryan-Kapoor/d2l-cli/blob/v0.2.2/src/d2l/commands/dump.py
+
+D2L, Brightspace, and related marks are trademarks of D2L Corporation. This
+project is unofficial and is not affiliated with or endorsed by D2L
+Corporation, Aaryan Kapoor, or any educational institution.

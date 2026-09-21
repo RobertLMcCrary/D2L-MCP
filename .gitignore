@@ -1,0 +1,11 @@
+bin/
+dist/
+coverage.out
+*.prof
+*.test
+.DS_Store
+.idea/
+.vscode/
+.env
+.d2l/
+D2L_COURSE_SOP.md
