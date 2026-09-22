@@ -175,6 +175,34 @@ func TestAssignmentDownloadStreamsWithoutOverwrite(t *testing.T) {
 	}
 }
 
+func TestMatchNamedObjectLargeNumericID(t *testing.T) {
+	items := []Object{{
+		"Id":   float64(6812345),
+		"Name": "Problem Set 3",
+	}}
+
+	got, err := matchNamedObject(items, "6812345", "Id", "Name", "assignment")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["Name"] != "Problem Set 3" {
+		t.Fatalf("matched %#v", got)
+	}
+
+	got, err = matchNamedObject(items, "Problem Set 3", "Id", "Name", "assignment")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idText(got["Id"]) != "6812345" {
+		t.Fatalf("id text = %s", idText(got["Id"]))
+	}
+
+	stringID := []Object{{"Id": "6812345", "Name": "Problem Set 3"}}
+	if _, err := matchNamedObject(stringID, "6812345", "Id", "Name", "assignment"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func FuzzSafeFilename(f *testing.F) {
 	for _, seed := range []string{"notes.pdf", "../../token.json", `..\\token`, "\x00bad", ""} {
 		f.Add(seed)
