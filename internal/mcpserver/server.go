@@ -48,7 +48,7 @@ type ListCoursesInput struct {
 }
 
 type CourseInput struct {
-	Course string `json:"course" jsonschema:"required,Course name code or numeric org unit ID"`
+	Course string `json:"course" jsonschema:"Course name code or numeric org unit ID"`
 }
 
 type GradesInput struct {
@@ -71,13 +71,13 @@ type DueInput struct {
 }
 
 type DiscussionsInput struct {
-	Course  string `json:"course" jsonschema:"required,Course name code or numeric org unit ID"`
+	Course  string `json:"course" jsonschema:"Course name code or numeric org unit ID"`
 	ForumID int64  `json:"forum_id,omitempty" jsonschema:"Forum ID to list topics"`
 	TopicID int64  `json:"topic_id,omitempty" jsonschema:"Topic ID to list posts; requires forum_id"`
 }
 
 type ContentInput struct {
-	Course   string `json:"course" jsonschema:"required,Course name code or numeric org unit ID"`
+	Course   string `json:"course" jsonschema:"Course name code or numeric org unit ID"`
 	Mode     string `json:"mode,omitempty" jsonschema:"root toc or module; defaults to root"`
 	ModuleID int64  `json:"module_id,omitempty" jsonschema:"Required when mode is module"`
 }
@@ -93,18 +93,18 @@ type SnapshotInput struct {
 }
 
 type AssignmentDownloadInput struct {
-	Course     string `json:"course" jsonschema:"required,Course name code or numeric org unit ID"`
-	Assignment string `json:"assignment" jsonschema:"required,Assignment name substring or numeric ID"`
+	Course     string `json:"course" jsonschema:"Course name code or numeric org unit ID"`
+	Assignment string `json:"assignment" jsonschema:"Assignment name substring or numeric ID"`
 }
 
 type ModuleDownloadInput struct {
-	Course string `json:"course" jsonschema:"required,Course name code or numeric org unit ID"`
-	Module string `json:"module" jsonschema:"required,Content module name substring or numeric ID"`
+	Course string `json:"course" jsonschema:"Course name code or numeric org unit ID"`
+	Module string `json:"module" jsonschema:"Content module name substring or numeric ID"`
 }
 
 type TopicDownloadInput struct {
-	Course   string `json:"course" jsonschema:"required,Course name code or numeric org unit ID"`
-	TopicID  int64  `json:"topic_id" jsonschema:"required,Numeric Brightspace content topic ID"`
+	Course   string `json:"course" jsonschema:"Course name code or numeric org unit ID"`
+	TopicID  int64  `json:"topic_id" jsonschema:"Numeric Brightspace content topic ID"`
 	Filename string `json:"filename,omitempty" jsonschema:"Fallback filename when the server omits one"`
 }
 
@@ -590,6 +590,49 @@ func addCourseListTool(
 	)
 }
 
+func normalizeToolSchema(schema *mcp.ToolArgumentsSchema) {
+	if schema == nil {
+		return
+	}
+	for key, property := range schema.Properties {
+		schema.Properties[key] = normalizeSchema(property)
+	}
+	if schema.AdditionalProperties == true {
+		schema.AdditionalProperties = map[string]any{}
+	}
+}
+
+func normalizeSchema(v any) any {
+	switch n := v.(type) {
+	case bool:
+		if n {
+			return map[string]any{
+				"description": "Unconstrained JSON value",
+			}
+		}
+		return false
+	case map[string]any:
+		for key, child := range n {
+			if key == "additionalProperties" && child == false {
+				continue
+			}
+			if key == "additionalProperties" && child == true {
+				n[key] = map[string]any{}
+				continue
+			}
+			n[key] = normalizeSchema(child)
+		}
+		return n
+	case []any:
+		for i := range n {
+			n[i] = normalizeSchema(n[i])
+		}
+		return n
+	default:
+		return v
+	}
+}
+
 func addTool[I, O any](
 	s *server.MCPServer,
 	name string,
@@ -608,6 +651,9 @@ func addTool[I, O any](
 	options = append(options, annotations...)
 
 	tool := mcp.NewTool(name, options...)
+
+	normalizeToolSchema((*mcp.ToolArgumentsSchema)(&tool.InputSchema))
+	normalizeToolSchema((*mcp.ToolArgumentsSchema)(&tool.OutputSchema))
 
 	handler := func(
 		ctx context.Context,
