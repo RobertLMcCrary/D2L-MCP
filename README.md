@@ -3,7 +3,7 @@
 [![CI](https://github.com/RobertLMcCrary/D2L-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/RobertLMcCrary/D2L-MCP/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/RobertLMcCrary/D2L-MCP?include_prereleases&sort=semver)](https://github.com/RobertLMcCrary/D2L-MCP/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/RobertLMcCrary/D2L-MCP)](go.mod)
-[![License](https://img.shields.io/github/license/RobertLMcCrary/D2L-MCP)](LICENSE)
+[![License](https://img.shields.io/github/license/RobertLMcCrary/D2L-MCP)](LICENSE.md)
 
 A local [Model Context Protocol](https://modelcontextprotocol.io/) server for read-only D2L Brightspace academic data. It runs over stdio and is written in Go with [mark3labs/mcp-go](https://github.com/mark3labs/mcp-go).
 
