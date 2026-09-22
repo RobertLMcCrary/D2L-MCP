@@ -404,10 +404,18 @@ func courseDir(course Course) string {
 	return fmt.Sprintf("%s-%d", safeFilename(course.Name, "course"), course.ID)
 }
 
+func idText(value any) string {
+	if id, ok := numberInt64(value); ok {
+		return strconv.FormatInt(id, 10)
+	}
+
+	return stringValue(value)
+}
+
 func matchNamedObject(items []Object, query, idKey, nameKey, kind string) (Object, error) {
 	query = strings.TrimSpace(query)
 	for _, item := range items {
-		if stringValue(item[idKey]) == query || strings.EqualFold(stringValue(item[nameKey]), query) {
+		if idText(item[idKey]) == query || strings.EqualFold(stringValue(item[nameKey]), query) {
 			return item, nil
 		}
 	}
