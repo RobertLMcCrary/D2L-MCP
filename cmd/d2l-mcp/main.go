@@ -5,14 +5,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/RobertLMcCrary/D2L-MCP/internal/app"
 	"github.com/RobertLMcCrary/D2L-MCP/internal/auth"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/canvas"
 	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/lms"
 	"github.com/RobertLMcCrary/D2L-MCP/internal/mcpserver"
 )
 
@@ -87,7 +91,10 @@ func serve() error {
 
 func setup(args []string) error {
 	flags := flag.NewFlagSet("setup", flag.ContinueOnError)
-	host := flags.String("host", "", "Brightspace HTTPS host")
+	host := flags.String("host", "", "LMS HTTPS host")
+	provider := flags.String("provider", "", "LMS provider: d2l or canvas")
+	toolProfile := flags.String("tool-profile", "", "Canvas tool catalog: full or compact (discover and invoke operations)")
+	enableWrites := flags.Bool("enable-writes", false, "Enable Canvas academic writes")
 	syllabusHost := flags.String("syllabus-host", "", "SimpleSyllabus HTTPS host")
 	schoolName := flags.String("school", "", "School preset: ksu or gsu")
 	show := flags.Bool("show", false, "Show current configuration")
@@ -117,13 +124,29 @@ func setup(args []string) error {
 	if *show {
 		return writeJSON(current)
 	}
+	if *provider != "" {
+		current.Provider = *provider
+	}
+	if *toolProfile != "" {
+		current.ToolProfile = *toolProfile
+	}
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "enable-writes" {
+			current.EnableWrites = *enableWrites
+		}
+	})
 
 	if *schoolName != "" {
+		if *provider == "canvas" {
+			return fmt.Errorf("Brightspace school presets cannot be used with --provider canvas; supply --host")
+		}
 		preset, ok := schools[*schoolName]
 		if !ok {
 			return fmt.Errorf("unknown school preset %q; use --list-schools", *schoolName)
 		}
 		current.School, current.LMSHost, current.SyllabusHost = preset.Name, preset.LMSHost, preset.SyllabusHost
+		current.Provider = "d2l"
+		current.EnableWrites = false
 	}
 
 	if *host != "" {
@@ -154,6 +177,7 @@ func login(args []string) error {
 	flags := flag.NewFlagSet("login", flag.ContinueOnError)
 	headless := flags.Bool("headless", false, "Run browser without a visible window")
 	timeout := flags.Duration("timeout", 5*time.Minute, "Maximum login time")
+	tokenStdin := flags.Bool("token-stdin", false, "Read a Canvas token from stdin; verify before storing")
 
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -170,6 +194,32 @@ func login(args []string) error {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	if service.Config.Provider == "canvas" {
+		if !*tokenStdin {
+			return fmt.Errorf("Canvas uses access tokens: run login --token-stdin or set CANVAS_TOKEN")
+		}
+		raw, err := io.ReadAll(io.LimitReader(os.Stdin, 16<<10))
+		if err != nil {
+			return err
+		}
+		if len(raw) >= 16<<10 {
+			return fmt.Errorf("token input exceeds limit")
+		}
+		client, err := canvas.New(service.Config.LMSHost, strings.TrimSpace(string(raw)), false, nil)
+		if err != nil {
+			return err
+		}
+		checkCtx, stop := context.WithTimeout(ctx, min(*timeout, 45*time.Second))
+		defer stop()
+		if _, err := client.Do(checkCtx, lms.Request{Path: "/api/v1/users/self/profile"}); err != nil {
+			return err
+		}
+		if err := auth.SaveCanvas(service.Paths, service.Config.LMSHost, string(raw)); err != nil {
+			return err
+		}
+		fmt.Println("Canvas token verified and stored for the configured host")
+		return nil
+	}
 
 	options := auth.LoginOptions{
 		Headless: *headless,
@@ -206,6 +256,9 @@ func doctor(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
+	if service.Config.Provider == "canvas" {
+		return writeJSON(service.ProviderStatus(ctx, *network))
+	}
 	return writeJSON(service.Status(ctx, *network))
 }
 
@@ -219,8 +272,9 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `Usage: d2l-mcp [serve|setup|login|doctor|version]
 
   serve    Start the local stdio MCP server (default)
-  setup    Configure a Brightspace and optional SimpleSyllabus host
-  login    Open Chrome and capture a Brightspace API token
+  setup    Configure --provider d2l|canvas and --host HTTPS_ORIGIN
+           Canvas: --enable-writes and --tool-profile full|compact
+  login    Brightspace browser login; Canvas: --token-stdin (or CANVAS_TOKEN)
   doctor   Print structured setup and API diagnostics
   version  Print the server version`)
 }

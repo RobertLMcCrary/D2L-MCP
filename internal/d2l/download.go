@@ -3,6 +3,7 @@ package d2l
 import (
 	"context"
 	"fmt"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/lms"
 	"io"
 	"mime"
 	"net/http"
@@ -21,6 +22,10 @@ type DownloadedFile struct {
 	Size        int64  `json:"size"`
 	ContentType string `json:"content_type,omitempty"`
 	SourceID    int64  `json:"source_id"`
+}
+
+func (f DownloadedFile) Artifact() lms.FileArtifact {
+	return lms.FileArtifact{Name: f.Name, URI: f.URI, Size: f.Size, ContentType: f.ContentType}
 }
 
 type Downloader struct {

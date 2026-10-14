@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/state"
 	"net"
 	"net/url"
 	"os"
@@ -22,6 +23,9 @@ const (
 )
 
 type Config struct {
+	Provider     string `json:"provider,omitempty"`
+	EnableWrites bool   `json:"enable_writes,omitempty"`
+	ToolProfile  string `json:"tool_profile,omitempty"`
 	School       string `json:"school,omitempty"`
 	LMSHost      string `json:"lms_host,omitempty"`
 	SyllabusHost string `json:"syllabus_host,omitempty"`
@@ -32,6 +36,7 @@ type Paths struct {
 	Dir            string
 	Config         string
 	Token          string
+	CanvasToken    string
 	BrowserProfile string
 	Downloads      string
 }
@@ -43,11 +48,15 @@ func DefaultPaths() (Paths, error) {
 	}
 
 	dir := filepath.Join(home, ".d2l")
+	if value := os.Getenv("LMS_STATE_DIR"); value != "" {
+		dir = value
+	}
 
 	return Paths{
 		Dir:            dir,
 		Config:         filepath.Join(dir, "config.json"),
 		Token:          filepath.Join(dir, "token.json"),
+		CanvasToken:    filepath.Join(dir, "canvas-token.json"),
 		BrowserProfile: filepath.Join(dir, "browser_profile"),
 		Downloads:      filepath.Join(dir, "downloads"),
 	}, nil
@@ -57,14 +66,13 @@ func Load(paths Paths) (Config, error) {
 	var cfg Config
 
 	data, err := os.ReadFile(paths.Config)
-	if errors.Is(err, os.ErrNotExist) {
-		return cfg, nil
-	}
-	if err != nil {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return cfg, fmt.Errorf("read config: %w", err)
 	}
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return cfg, fmt.Errorf("parse config: %w", err)
+	if len(data) != 0 {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return cfg, fmt.Errorf("parse config: %w", err)
+		}
 	}
 
 	if value := os.Getenv("D2L_HOST"); value != "" {
@@ -74,6 +82,16 @@ func Load(paths Paths) (Config, error) {
 		cfg.SyllabusHost = value
 	}
 	if value := os.Getenv("D2L_DOWNLOAD_DIR"); value != "" {
+		cfg.DownloadDir = value
+	}
+	if value := os.Getenv("LMS_PROVIDER"); value != "" {
+		cfg.Provider = value
+	}
+	if value := os.Getenv("CANVAS_HOST"); value != "" {
+		cfg.LMSHost = value
+		cfg.Provider = "canvas"
+	}
+	if value := os.Getenv("LMS_DOWNLOAD_DIR"); value != "" {
 		cfg.DownloadDir = value
 	}
 
@@ -92,14 +110,26 @@ func Save(paths Paths, cfg Config) error {
 
 	data = append(data, '\n')
 
-	return atomicWrite(paths.Config, data, 0o600)
+	return state.WriteFile(paths.Config, data, 0o600)
 }
 
 func Validate(cfg *Config, allowPrivate bool) error {
+	if cfg.ToolProfile != "" && cfg.ToolProfile != "full" && cfg.ToolProfile != "compact" {
+		return fmt.Errorf("tool_profile must be full or compact")
+	}
+	if cfg.Provider == "" {
+		cfg.Provider = "d2l"
+	}
+	if cfg.Provider != "d2l" && cfg.Provider != "canvas" {
+		return fmt.Errorf("unsupported LMS provider %q", cfg.Provider)
+	}
+	if cfg.Provider == "d2l" && cfg.EnableWrites {
+		return errors.New("Brightspace academic writes are not supported")
+	}
 	var err error
 	cfg.LMSHost, err = NormalizeHost(cfg.LMSHost, allowPrivate)
 	if err != nil {
-		return fmt.Errorf("invalid Brightspace host: %w", err)
+		return fmt.Errorf("invalid LMS host: %w", err)
 	}
 
 	if cfg.SyllabusHost != "" {
@@ -151,6 +181,8 @@ func NormalizeHost(raw string, allowPrivate bool) (string, error) {
 	port := u.Port()
 	if port != "" {
 		host = net.JoinHostPort(host, port)
+	} else if strings.Contains(host, ":") {
+		host = "[" + host + "]"
 	}
 
 	return "https://" + host, nil
@@ -161,33 +193,4 @@ func DownloadRoot(paths Paths, cfg Config) string {
 		return cfg.DownloadDir
 	}
 	return paths.Downloads
-}
-
-func atomicWrite(path string, data []byte, mode os.FileMode) error {
-	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".tmp-*")
-	if err != nil {
-		return err
-	}
-
-	name := tmp.Name()
-	defer os.Remove(name)
-
-	if err := tmp.Chmod(mode); err != nil {
-		tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-
-	return os.Rename(name, path)
 }

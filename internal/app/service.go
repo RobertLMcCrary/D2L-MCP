@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,8 +15,9 @@ import (
 )
 
 type Service struct {
-	Paths  config.Paths
-	Config config.Config
+	Paths         config.Paths
+	Config        config.Config
+	HTTPTransport http.RoundTripper
 
 	mu       sync.Mutex
 	token    string

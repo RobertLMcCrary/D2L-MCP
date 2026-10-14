@@ -1,5 +1,10 @@
 # D2L MCP
 
+This working tree adds a shared LMS provider layer and Canvas student API support,
+including submissions, uploads, feedback, inbox, discussions, calendar, settings
+and a compact discovery catalog. See [Canvas setup, coverage and validation](docs/CANVAS.md).
+Brightspace usage below remains compatible.
+
 [![CI](https://github.com/RobertLMcCrary/D2L-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/RobertLMcCrary/D2L-MCP/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/RobertLMcCrary/D2L-MCP?include_prereleases&sort=semver)](https://github.com/RobertLMcCrary/D2L-MCP/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/RobertLMcCrary/D2L-MCP)](go.mod)
@@ -46,7 +51,7 @@ Release binaries are not currently code-signed or notarized. Your operating syst
 
 ### Build from source
 
-Building requires Go 1.25.5 or newer:
+Building requires Go 1.26 or newer:
 
 ```sh
 git clone https://github.com/RobertLMcCrary/D2L-MCP.git

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"math/rand/v2"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/lmshttp"
 )
 
 const (
@@ -59,7 +59,7 @@ func NewClient(host, token string) (*Client, error) {
 					return http.ErrUseLastResponse
 				}
 
-				if !strings.EqualFold(req.URL.Hostname(), u.Hostname()) {
+				if !lmshttp.SameOrigin(req.URL, u) {
 					return fmt.Errorf("refusing cross-host redirect to %s", req.URL.Hostname())
 				}
 
@@ -92,10 +92,11 @@ func (c *Client) Get(ctx context.Context, path string, query url.Values, out any
 	}
 	defer resp.Body.Close()
 
-	body := io.LimitReader(resp.Body, maxJSONBodyBytes+1)
-	decoder := json.NewDecoder(body)
-
-	if err := decoder.Decode(out); err != nil {
+	body, err := lmshttp.ReadJSON(resp.Body, maxJSONBodyBytes)
+	if err == nil {
+		err = json.Unmarshal(body, out)
+	}
+	if err != nil {
 		return &Error{
 			Code:    ErrInvalidResponse,
 			Message: "Brightspace returned invalid JSON.",
@@ -114,8 +115,14 @@ func (c *Client) request(ctx context.Context, path string, query url.Values) (*h
 	if !strings.HasPrefix(path, "/d2l/api/") {
 		return nil, &Error{Code: ErrConfig, Message: "Refusing a non-Valence API path."}
 	}
+	if strings.ContainsAny(path, "\\%?#\x00\r\n") || strings.Contains(path, "/../") || strings.HasSuffix(path, "/..") {
+		return nil, &Error{Code: ErrConfig, Message: "Refusing an unsafe Valence API path."}
+	}
 
 	u := c.host.ResolveReference(&url.URL{Path: path})
+	if !strings.HasPrefix(u.Path, "/d2l/api/") {
+		return nil, &Error{Code: ErrConfig, Message: "Refusing a non-Valence API path."}
+	}
 	u.RawQuery = query.Encode()
 
 	for attempt := 0; attempt < c.maxRetries; attempt++ {
@@ -466,12 +473,7 @@ func dateQuery(orgIDs, start, end string) url.Values {
 }
 
 func cloneValues(values url.Values) url.Values {
-	out := url.Values{}
-	for key, entries := range values {
-		out[key] = append([]string(nil), entries...)
-	}
-
-	return out
+	return lmshttp.CloneQuery(values)
 }
 
 type authTransport struct {
@@ -482,6 +484,10 @@ type authTransport struct {
 }
 
 func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	origin, err := url.Parse(t.origin)
+	if err != nil || !lmshttp.SameOrigin(req.URL, origin) {
+		return nil, &Error{Code: ErrConfig, Message: "Refusing to send Brightspace credentials across origins."}
+	}
 	clone := req.Clone(req.Context())
 	clone.Header = req.Header.Clone()
 

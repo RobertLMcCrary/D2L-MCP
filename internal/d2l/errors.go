@@ -1,11 +1,8 @@
 package d2l
 
-import (
-	"errors"
-	"fmt"
-)
+import "github.com/RobertLMcCrary/D2L-MCP/internal/lms"
 
-type ErrorCode string
+type ErrorCode = lms.ErrorCode
 
 const (
 	ErrConfig          ErrorCode = "CONFIG_REQUIRED"
@@ -19,36 +16,8 @@ const (
 	ErrTooLarge        ErrorCode = "TOO_LARGE"
 )
 
-type Error struct {
-	Code       ErrorCode `json:"code"`
-	Message    string    `json:"message"`
-	NextStep   string    `json:"next_step,omitempty"`
-	StatusCode int       `json:"status_code,omitempty"`
-	Cause      error     `json:"-"`
-}
-
-func (e *Error) Error() string {
-	if e.NextStep == "" {
-		return e.Message
-	}
-
-	return fmt.Sprintf("%s Next: %s", e.Message, e.NextStep)
-}
-
-func (e *Error) Unwrap() error {
-	return e.Cause
-}
+type Error = lms.Error
 
 func AsError(err error) *Error {
-	var target *Error
-
-	if errors.As(err, &target) {
-		return target
-	}
-
-	return &Error{
-		Code:    ErrInvalidResponse,
-		Message: err.Error(),
-		Cause:   err,
-	}
+	return lms.AsError(err)
 }
