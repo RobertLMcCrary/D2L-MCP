@@ -35,7 +35,8 @@ jobs:
           go-version-file: go.mod
           cache: true
       - run: go build -trimpath -o d2l-mcp ./cmd/d2l-mcp
-      - run: D2L_MCP_TEST_BINARY="$PWD/d2l-mcp" go test ./internal/mcpserver -run TestStdioSubprocess -count=1
+      - run: D2L_MCP_TEST_BINARY="$PWD/d2l-mcp" go test ./internal/mcpserver -run StdioSubprocess -count=1
+      - run: go test ./internal/canvas -run '^$' -fuzz FuzzAPIPath -fuzztime=10s
 
   release-snapshot:
     runs-on: ubuntu-latest
