@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 
 	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
@@ -71,24 +70,28 @@ func Login(ctx context.Context, paths config.Paths, host string, options LoginOp
 		}
 	}
 
-	chromedp.ListenTarget(browser, func(event any) {
-		request, ok := event.(*network.EventRequestWillBeSent)
-		if !ok {
-			return
-		}
-
-		for key, value := range request.Request.Headers {
-			if strings.EqualFold(key, "Authorization") {
-				store(fmt.Sprint(value))
+	events := chromedp.Events(browser, network.RequestWillBeSent)
+	go func() {
+		for request, err := range events {
+			if err != nil {
+				return
+			}
+			for key, value := range request.Request.Headers {
+				if strings.EqualFold(key, "Authorization") {
+					store(fmt.Sprint(value))
+				}
 			}
 		}
-	})
+	}()
 
 	loginURL := strings.TrimRight(host, "/") + "/d2l/home"
 
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		browser,
-		network.Enable(),
+		chromedp.Func(func(ctx context.Context, target *chromedp.Target) error {
+			_, err := cdp.Call(ctx, target, network.Enable, network.EnableParams{})
+			return err
+		}),
 		chromedp.Navigate(loginURL),
 	); err != nil {
 		return Status{}, fmt.Errorf("launch browser: %w", err)
@@ -218,32 +221,10 @@ func evaluateToken(ctx context.Context) string {
 		} catch (_) { return ""; }
 	})()`
 
-	var raw json.RawMessage
-
-	err := chromedp.Run(ctx, chromedp.ActionFunc(func(actionCtx context.Context) error {
-		result, exception, err := runtime.Evaluate(script).
-			WithAwaitPromise(true).
-			WithReturnByValue(true).
-			Do(actionCtx)
-		if err != nil {
-			return err
-		}
-
-		if exception != nil {
-			return errors.New(exception.Text)
-		}
-
-		raw = json.RawMessage(result.Value)
-
-		return nil
-	}))
+	token, err := chromedp.Run(ctx, chromedp.Evaluate[string](script, chromedp.EvalAwaitPromise))
 	if err != nil {
 		return ""
 	}
-
-	var token string
-
-	_ = json.Unmarshal(raw, &token)
 
 	if _, err := Validate(token); err != nil {
 		return ""
