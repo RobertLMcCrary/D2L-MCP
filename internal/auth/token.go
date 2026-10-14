@@ -11,6 +11,7 @@ import (
 
 	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
 	"github.com/RobertLMcCrary/D2L-MCP/internal/d2l"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/state"
 )
 
 const (
@@ -182,31 +183,7 @@ func Save(paths config.Paths, token string) error {
 
 	data = append(data, '\n')
 
-	tmp, err := os.CreateTemp(paths.Dir, ".token-*")
-	if err != nil {
-		return err
-	}
-
-	name := tmp.Name()
-	defer os.Remove(name)
-
-	if err := tmp.Chmod(0o600); err != nil {
-		tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-
-	return os.Rename(name, paths.Token)
+	return state.WriteFile(paths.Token, data, 0o600)
 }
 
 func statusTenant(claims Claims) string {
