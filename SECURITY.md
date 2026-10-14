@@ -1,5 +1,12 @@
 # Security policy
 
+Canvas support is provider-specific: remote writes are disabled unless enabled in
+configuration. Canvas guidance requires an explicit user request for submissions,
+messages, posts and settings changes. Data is untrusted input. Stored Canvas
+credentials are bound to their origin; storage POSTs and external downloads never
+receive Canvas bearer credentials. File transfers are directory-scoped and bounded.
+See [Canvas implementation and limits](docs/CANVAS.md).
+
 ## Reporting a vulnerability
 
 Do not open a public issue containing tokens, cookies, student records, grades, private course content, or a working exploit. Contact the maintainers privately through the security-reporting channel configured on the repository.
@@ -26,4 +33,6 @@ Until the first stable release, security fixes are provided on the latest tagged
 - Review MCP client permissions before enabling download tools.
 - Set `D2L_NO_AUTO_LOGIN=1` where browser-based silent refresh is inappropriate.
 
-The server intentionally does not expose arbitrary Brightspace URLs or mutation endpoints.
+Brightspace academic mutations remain unsupported. The generic Brightspace read
+tool is restricted to Valence API paths. Canvas generic REST writes require the
+explicit write gate and Canvas's own permissions.
