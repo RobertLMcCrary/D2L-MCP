@@ -40,3 +40,33 @@ func TestSetupWritesCompatibleConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCanvasSetupAndOpaqueAuthenticationConfiguration(t *testing.T) {
+	t.Setenv("LMS_STATE_DIR", t.TempDir())
+	t.Setenv("CANVAS_HOST", "")
+	t.Setenv("LMS_PROVIDER", "")
+	if err := setup([]string{"--provider", "canvas", "--host", "school.instructure.com", "--enable-writes", "--tool-profile", "compact"}); err != nil {
+		t.Fatal(err)
+	}
+	paths, err := config.DefaultPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Provider != "canvas" || cfg.LMSHost != "https://school.instructure.com" || !cfg.EnableWrites || cfg.ToolProfile != "compact" {
+		t.Fatalf("bad Canvas config %+v", cfg)
+	}
+	if err := setup([]string{"--enable-writes=false"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = config.Load(paths)
+	if err != nil || cfg.EnableWrites {
+		t.Fatal("write disable ignored")
+	}
+	if err := login(nil); err == nil {
+		t.Fatal("Canvas attempted Brightspace browser login")
+	}
+}
