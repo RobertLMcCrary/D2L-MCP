@@ -8,4 +8,5 @@ coverage.out
 .vscode/
 .env
 .d2l/
+.canvas-state/
 D2L_COURSE_SOP.md
