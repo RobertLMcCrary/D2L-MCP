@@ -14,6 +14,7 @@ import (
 	"github.com/RobertLMcCrary/D2L-MCP/internal/app"
 	"github.com/RobertLMcCrary/D2L-MCP/internal/d2l"
 	"github.com/RobertLMcCrary/D2L-MCP/internal/guidance"
+	"github.com/RobertLMcCrary/D2L-MCP/internal/lms"
 )
 
 var Version = "dev"
@@ -24,10 +25,11 @@ type Meta struct {
 }
 
 type ErrorInfo struct {
-	Code       d2l.ErrorCode `json:"code"`
+	Code       lms.ErrorCode `json:"code"`
 	Message    string        `json:"message"`
 	NextStep   string        `json:"next_step,omitempty"`
 	StatusCode int           `json:"status_code,omitempty"`
+	Details    []string      `json:"details,omitempty"`
 }
 
 type Output[T any] struct {
@@ -118,19 +120,37 @@ type DownloadData struct {
 	Files  []d2l.DownloadedFile `json:"files"`
 }
 
+func (data DownloadData) Artifacts() []lms.FileArtifact {
+	result := make([]lms.FileArtifact, len(data.Files))
+	for i, file := range data.Files {
+		result[i] = file.Artifact()
+	}
+	return result
+}
+
 func New(service *app.Service) *server.MCPServer {
+	name, instructions := "D2L Brightspace", guidance.Instructions
+	if service.Config.Provider == "canvas" {
+		name = "Canvas LMS"
+		instructions = canvasInstructions
+	}
 	s := server.NewMCPServer(
-		"D2L Brightspace",
+		name,
 		Version,
-		server.WithInstructions(guidance.Instructions),
+		server.WithInstructions(instructions),
 		server.WithToolCapabilities(false),
 		server.WithResourceCapabilities(false, false),
 		server.WithPromptCapabilities(false),
 	)
 
-	registerTools(s, service)
-	registerResources(s)
-	registerPrompts(s)
+	registerProviderTools(s, service)
+	if service.Config.Provider == "canvas" {
+		registerCanvasTools(s, service)
+	} else {
+		registerTools(s, service)
+		registerResources(s)
+		registerPrompts(s)
+	}
 
 	return s
 }
@@ -597,6 +617,9 @@ func normalizeToolSchema(schema *mcp.ToolArgumentsSchema) {
 	for key, property := range schema.Properties {
 		schema.Properties[key] = normalizeSchema(property)
 	}
+	for key, definition := range schema.Defs {
+		schema.Defs[key] = normalizeSchema(definition)
+	}
 	if schema.AdditionalProperties == true {
 		schema.AdditionalProperties = map[string]any{}
 	}
@@ -641,6 +664,7 @@ func addTool[I, O any](
 	_ Output[O],
 	annotations []mcp.ToolOption,
 	fn func(context.Context, I) (O, error),
+	customize ...func(*mcp.Tool),
 ) {
 	options := []mcp.ToolOption{
 		mcp.WithDescription(description),
@@ -651,9 +675,21 @@ func addTool[I, O any](
 	options = append(options, annotations...)
 
 	tool := mcp.NewTool(name, options...)
+	// Current mcp-go emits generated input schemas as raw JSON. Convert once
+	// before normalization/customization so the advertised schema is the one
+	// that clients actually receive, including nested extension schemas.
+	if len(tool.RawInputSchema) != 0 {
+		if err := json.Unmarshal(tool.RawInputSchema, &tool.InputSchema); err != nil {
+			panic(fmt.Sprintf("invalid generated schema for %s: %v", name, err))
+		}
+		tool.RawInputSchema = nil
+	}
 
 	normalizeToolSchema((*mcp.ToolArgumentsSchema)(&tool.InputSchema))
 	normalizeToolSchema((*mcp.ToolArgumentsSchema)(&tool.OutputSchema))
+	for _, apply := range customize {
+		apply(&tool)
+	}
 
 	handler := func(
 		ctx context.Context,
@@ -676,12 +712,18 @@ func addTool[I, O any](
 		if snapshot, ok := any(value).(app.Snapshot); ok {
 			output.Meta.Partial = snapshot.Partial
 		}
+		if partial, ok := any(value).(interface{ IsPartial() bool }); ok {
+			output.Meta.Partial = partial.IsPartial()
+		}
 
 		fallback, _ := json.Marshal(output)
 		result := mcp.NewToolResultStructured(output, string(fallback))
 
-		if downloads, ok := any(value).(DownloadData); ok {
-			appendDownloadLinks(result, downloads.Files)
+		switch artifacts := any(value).(type) {
+		case interface{ Artifacts() []lms.FileArtifact }:
+			appendArtifactLinks(result, artifacts.Artifacts())
+		case interface{ Artifact() lms.FileArtifact }:
+			appendArtifactLinks(result, []lms.FileArtifact{artifacts.Artifact()})
 		}
 
 		return result, nil
@@ -700,6 +742,7 @@ func errorResult[O any](err error, fetchedAt string) *mcp.CallToolResult {
 			Message:    apiErr.Message,
 			NextStep:   apiErr.NextStep,
 			StatusCode: apiErr.StatusCode,
+			Details:    apiErr.Details,
 		},
 		Meta: Meta{FetchedAt: fetchedAt},
 	}
@@ -710,13 +753,13 @@ func errorResult[O any](err error, fetchedAt string) *mcp.CallToolResult {
 	return result
 }
 
-func appendDownloadLinks(result *mcp.CallToolResult, files []d2l.DownloadedFile) {
+func appendArtifactLinks(result *mcp.CallToolResult, files []lms.FileArtifact) {
 	for _, file := range files {
 		result.Content = append(result.Content, mcp.ResourceLink{
 			Type:        "resource_link",
 			URI:         file.URI,
 			Name:        file.Name,
-			Description: fmt.Sprintf("Downloaded D2L file (%d bytes)", file.Size),
+			Description: fmt.Sprintf("Downloaded file (%d bytes)", file.Size),
 			MIMEType:    file.ContentType,
 		})
 	}
