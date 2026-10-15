@@ -184,6 +184,9 @@ func rejectNonObjectSchemaNodes(t *testing.T, tool, path string, value any) {
 	case nil:
 		t.Errorf("%s %s is null", tool, path)
 	case map[string]any:
+		if isByteArraySchema(node) {
+			t.Errorf("%s %s is a byte array; json.RawMessage values marshal as arbitrary JSON", tool, path)
+		}
 		for key, child := range node {
 			if key == "additionalProperties" && child == false {
 				continue

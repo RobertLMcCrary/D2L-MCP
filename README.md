@@ -135,6 +135,7 @@ Read-only query tools:
 - `d2l_get_discussions`
 - `d2l_get_content`
 - `d2l_get_announcements`
+- `d2l_get_deadlines`
 - `d2l_get_calendar`
 - `d2l_get_due`
 - `d2l_get_overdue`

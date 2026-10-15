@@ -245,12 +245,7 @@ func (s *Service) Snapshot(ctx context.Context, queries []string, shallow bool, 
 	end := now.Add(7 * 24 * time.Hour)
 
 	overdue, overdueErr := client.Overdue(ctx, ids)
-	due, dueErr := client.Due(
-		ctx,
-		ids,
-		now.Format("2006-01-02T15:04:05.000Z"),
-		end.Format("2006-01-02T15:04:05.000Z"),
-	)
+	due, dueErr := client.Due(ctx, ids, now, end)
 
 	result := Snapshot{
 		GeneratedAt: now.Format(time.RFC3339),
@@ -271,9 +266,11 @@ func (s *Service) Snapshot(ctx context.Context, queries []string, shallow bool, 
 	}
 
 	since := ""
+	calendarStart := now
 
 	if sinceHours > 0 {
-		since = now.Add(-time.Duration(sinceHours * float64(time.Hour))).Format("2006-01-02T15:04:05.000Z")
+		calendarStart = now.Add(-time.Duration(sinceHours * float64(time.Hour)))
+		since = d2l.FormatTime(calendarStart)
 	}
 
 	for _, course := range courses {
@@ -291,8 +288,7 @@ func (s *Service) Snapshot(ctx context.Context, queries []string, shallow bool, 
 		entry.News, err = client.News(ctx, course.ID, since)
 		recordWarning(&result, err)
 
-		calendarEnd := now.Add(14 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z")
-		entry.Calendar, err = client.Calendar(ctx, &course.ID, since, calendarEnd)
+		entry.Calendar, err = client.Calendar(ctx, &course.ID, "", calendarStart, now.Add(14*24*time.Hour))
 		recordWarning(&result, err)
 
 		if since == "" {

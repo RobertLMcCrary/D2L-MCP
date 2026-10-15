@@ -3,6 +3,7 @@ package d2l
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -133,7 +134,15 @@ func (c *Client) request(ctx context.Context, path string, query url.Values) (*h
 
 		resp, err := c.http.Do(req)
 		if err != nil {
-			return nil, err
+			// GETs are idempotent, so a dropped or reset connection is retried
+			// like a rate limit. Cancellation and policy refusals are not.
+			if ctx.Err() != nil || attempt == c.maxRetries-1 || isPolicyError(err) {
+				return nil, err
+			}
+			if err := sleepContext(ctx, retryDelay("", attempt)); err != nil {
+				return nil, err
+			}
+			continue
 		}
 
 		if resp.StatusCode != http.StatusTooManyRequests || attempt == c.maxRetries-1 {
@@ -147,18 +156,31 @@ func (c *Client) request(ctx context.Context, path string, query url.Values) (*h
 
 		resp.Body.Close()
 
-		delay := retryDelay(resp.Header.Get("Retry-After"), attempt)
-		timer := time.NewTimer(delay)
-
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return nil, ctx.Err()
-		case <-timer.C:
+		if err := sleepContext(ctx, retryDelay(resp.Header.Get("Retry-After"), attempt)); err != nil {
+			return nil, err
 		}
 	}
 
 	panic("unreachable")
+}
+
+func sleepContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// isPolicyError reports refusals raised by this client (cross-origin
+// credentials or redirects), which fail the same way on every attempt.
+func isPolicyError(err error) bool {
+	var apiErr *Error
+	return errors.As(err, &apiErr) || strings.Contains(err.Error(), "refusing cross-host redirect")
 }
 
 func responseError(resp *http.Response) error {
@@ -351,28 +373,23 @@ func (c *Client) UserFeed(ctx context.Context, since string) ([]Object, error) {
 	return c.getList(ctx, c.LP("/feed/"), query, "")
 }
 
-func (c *Client) Calendar(ctx context.Context, orgID *int64, start, end string) ([]Object, error) {
-	query := url.Values{}
-	if start != "" {
-		query.Set("startDateTime", start)
-	}
-	if end != "" {
-		query.Set("endDateTime", end)
-	}
-
-	path := c.LE("/calendar/events/myEvents/")
-
+// Calendar returns the user's events in one course, or across orgIDs when
+// orgID is nil. Brightspace rejects the cross-course route without
+// orgUnitIdsCSV, and both routes require a date window.
+func (c *Client) Calendar(ctx context.Context, orgID *int64, orgIDs string, start, end time.Time) ([]Object, error) {
 	if orgID != nil {
-		path = c.LE(fmt.Sprintf("/%d/calendar/events/myEvents/", *orgID))
+		path := c.LE(fmt.Sprintf("/%d/calendar/events/myEvents/", *orgID))
+		return c.paginateObjects(ctx, path, dateQuery("", start, end))
+	}
+	if orgIDs == "" {
+		return []Object{}, nil
 	}
 
-	return c.getList(ctx, path, query, "")
+	return c.paginateObjects(ctx, c.LE("/calendar/events/myEvents/"), dateQuery(orgIDs, start, end))
 }
 
-func (c *Client) Due(ctx context.Context, orgIDs string, start, end string) ([]Object, error) {
-	query := dateQuery(orgIDs, start, end)
-
-	return c.getList(ctx, c.LE("/content/myItems/due/"), query, "Objects")
+func (c *Client) Due(ctx context.Context, orgIDs string, start, end time.Time) ([]Object, error) {
+	return c.paginateObjects(ctx, c.LE("/content/myItems/due/"), dateQuery(orgIDs, start, end))
 }
 
 func (c *Client) Overdue(ctx context.Context, orgIDs string) ([]Object, error) {
@@ -381,7 +398,14 @@ func (c *Client) Overdue(ctx context.Context, orgIDs string) ([]Object, error) {
 		query.Set("orgUnitIdsCSV", orgIDs)
 	}
 
-	return c.getList(ctx, c.LE("/overdueItems/myItems"), query, "Objects")
+	return c.paginateObjects(ctx, c.LE("/overdueItems/myItems"), query)
+}
+
+// MySubmissions returns the user's EntityDropbox entries for one folder.
+func (c *Client) MySubmissions(ctx context.Context, orgID, folderID int64) ([]Object, error) {
+	path := c.LE(fmt.Sprintf("/%d/dropbox/folders/%d/submissions/mysubmissions/", orgID, folderID))
+
+	return c.getList(ctx, path, nil, "")
 }
 
 func (c *Client) Updates(ctx context.Context, orgID *int64, orgIDs string) (any, error) {
@@ -450,23 +474,82 @@ func (c *Client) getList(ctx context.Context, path string, query url.Values, obj
 
 	var items []Object
 
+	// An unexpected envelope used to read as an empty list, which made
+	// failures look like "nothing due". Report the mismatch instead.
 	if err := json.Unmarshal(raw, &items); err != nil {
-		return []Object{}, nil
+		return nil, &Error{
+			Code:    ErrInvalidResponse,
+			Message: "Brightspace returned an unexpected list shape.",
+			Cause:   err,
+		}
+	}
+
+	if items == nil {
+		items = []Object{}
 	}
 
 	return items, nil
 }
 
-func dateQuery(orgIDs, start, end string) url.Values {
+// paginateObjects follows ObjectListPage Next links. Next may be absolute;
+// it must stay on the configured origin.
+func (c *Client) paginateObjects(ctx context.Context, path string, query url.Values) ([]Object, error) {
+	result := []Object{}
+	seen := map[string]bool{}
+
+	for page := 0; page < maxPages; page++ {
+		var data struct {
+			Objects []Object `json:"Objects"`
+			Next    *string  `json:"Next"`
+		}
+
+		if err := c.Get(ctx, path, query, &data); err != nil {
+			return nil, err
+		}
+
+		result = append(result, data.Objects...)
+
+		if data.Next == nil || *data.Next == "" {
+			return result, nil
+		}
+
+		next, err := c.host.Parse(*data.Next)
+		if err != nil || !lmshttp.SameOrigin(next, c.host) || seen[next.String()] {
+			return nil, &Error{
+				Code:    ErrInvalidResponse,
+				Message: "Brightspace returned an invalid pagination link.",
+				Cause:   err,
+			}
+		}
+
+		seen[next.String()] = true
+		path, query = next.Path, next.Query()
+	}
+
+	return nil, &Error{
+		Code:    ErrInvalidResponse,
+		Message: "Brightspace pagination exceeded the safety limit.",
+	}
+}
+
+// Brightspace UTCDateTime requires milliseconds. RFC 3339 without them is
+// rejected by calendar routes and silently ignored by myItems/due.
+const timeLayout = "2006-01-02T15:04:05.000Z"
+
+func FormatTime(t time.Time) string {
+	return t.UTC().Format(timeLayout)
+}
+
+func dateQuery(orgIDs string, start, end time.Time) url.Values {
 	query := url.Values{}
 	if orgIDs != "" {
 		query.Set("orgUnitIdsCSV", orgIDs)
 	}
-	if start != "" {
-		query.Set("startDateTime", start)
+	if !start.IsZero() {
+		query.Set("startDateTime", FormatTime(start))
 	}
-	if end != "" {
-		query.Set("endDateTime", end)
+	if !end.IsZero() {
+		query.Set("endDateTime", FormatTime(end))
 	}
 
 	return query

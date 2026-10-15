@@ -9,7 +9,8 @@
 - `d2l_get_discussions`: forums, topics, or posts
 - `d2l_get_content`: course root, table of contents, or module structure
 - `d2l_get_announcements`: course announcements
-- `d2l_get_calendar`: global or course calendar
+- `d2l_get_deadlines`: primary deadline view built from course assignments, quizzes and content, with status; calendar merged as a supplement
+- `d2l_get_calendar`: global or course calendar events; incomplete on its own
 - `d2l_get_due` / `d2l_get_overdue`: deadline views
 - `d2l_get_updates`: unread/update counts
 - `d2l_get_syllabus`: SimpleSyllabus text and metadata
