@@ -43,7 +43,7 @@ type APIWriteInput struct {
 	Method string                     `json:"method" jsonschema:"POST PUT PATCH or DELETE"`
 	Path   string                     `json:"path"`
 	Query  url.Values                 `json:"query,omitempty"`
-	Body   map[string]json.RawMessage `json:"body,omitempty" jsonschema:"JSON object with native nested Canvas fields and lossless numbers"`
+	Body   map[string]json.RawMessage `json:"body,omitempty" jsonschema:"JSON object with the provider's native nested fields and lossless numbers"`
 }
 
 func registerProviderTools(s *server.MCPServer, service *app.Service) {
@@ -57,10 +57,10 @@ func registerProviderTools(s *server.MCPServer, service *app.Service) {
 		}
 		return p.Do(ctx, lms.Request{Path: input.Path, Query: input.Query, Paginate: input.Paginate, Collection: input.Collection})
 	})
-	if service.Config.Provider == "canvas" && service.Config.EnableWrites {
+	if service.Config.EnableWrites {
 		annotations := writeAnnotations()
 		annotations = append(annotations, mcp.WithDestructiveHintAnnotation(true))
-		addTool(s, "lms_api_write", "Execute an explicitly user-requested Canvas JSON REST mutation. Supports settings, inbox, discussions, planner, groups and other permitted resources. Writes are not retried. DELETE and some updates are destructive; inspect state before acting.", APIWriteInput{}, Output[lms.Response]{}, annotations, func(ctx context.Context, input APIWriteInput) (lms.Response, error) {
+		addTool(s, "lms_api_write", "Execute an explicitly user-requested JSON REST mutation on the selected provider (Canvas /api/v1/, D2L /d2l/api/). Prefer named tools; use this for routes they do not cover. Writes are not retried. DELETE and some updates are destructive; inspect state before acting.", APIWriteInput{}, Output[lms.Response]{}, annotations, func(ctx context.Context, input APIWriteInput) (lms.Response, error) {
 			method := strings.ToUpper(input.Method)
 			if method != "POST" && method != "PUT" && method != "PATCH" && method != "DELETE" {
 				return lms.Response{}, lms.Invalid("Use POST PUT PATCH or DELETE")

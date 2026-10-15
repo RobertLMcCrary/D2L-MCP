@@ -303,18 +303,17 @@ func normalizeName(name string) string {
 	return strings.ToLower(strings.Join(strings.Fields(name), " "))
 }
 
+// stringField reads names, dates and IDs; Brightspace sends IDs as numbers
+// in some routes and strings in others.
 func stringField(object map[string]any, key string) string {
-	switch v := object[key].(type) {
-	case string:
-		return v
-	case float64:
-		return strconv.FormatFloat(v, 'f', -1, 64)
-	}
-	return ""
+	return idText(object[key])
 }
 
 func int64Field(object map[string]any, key string) int64 {
-	id, _ := strconv.ParseInt(stringField(object, key), 10, 64)
+	if id, ok := numberInt64(object[key]); ok {
+		return id
+	}
+	id, _ := strconv.ParseInt(stringValue(object[key]), 10, 64)
 	return id
 }
 

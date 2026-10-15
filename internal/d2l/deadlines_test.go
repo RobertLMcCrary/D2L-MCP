@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/RobertLMcCrary/D2L-MCP/internal/config"
 )
 
 func TestCalendarSendsMillisecondDatesAndCourseIDs(t *testing.T) {
@@ -18,7 +20,7 @@ func TestCalendarSendsMillisecondDatesAndCourseIDs(t *testing.T) {
 			t.Errorf("startDateTime = %q, want millisecond UTCDateTime", query.Get("startDateTime"))
 		}
 		if query.Get("bookmark") == "" {
-			_, _ = w.Write([]byte(`{"Objects":[{"CalendarEventId":1}],"Next":"/d2l/api/le/1.80/calendar/events/myEvents/?bookmark=2&orgUnitIdsCSV=1,2&startDateTime=2026-10-15T12:00:00.000Z"}`))
+			_, _ = w.Write([]byte(`{"Objects":[{"CalendarEventId":1}],"Next":"/d2l/api/le/1.82/calendar/events/myEvents/?bookmark=2&orgUnitIdsCSV=1,2&startDateTime=2026-10-15T12:00:00.000Z"}`))
 			return
 		}
 		_, _ = w.Write([]byte(`{"Objects":[{"CalendarEventId":2}],"Next":null}`))
@@ -47,7 +49,7 @@ func TestCalendarWithoutCoursesSkipsRequest(t *testing.T) {
 
 func TestPaginationRejectsCrossOriginNext(t *testing.T) {
 	client := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"Objects":[],"Next":"https://evil.example/d2l/api/le/1.80/x"}`))
+		_, _ = w.Write([]byte(`{"Objects":[],"Next":"https://evil.example/d2l/api/le/1.82/x"}`))
 	}))
 
 	if _, err := client.Due(t.Context(), "1", time.Now(), time.Now()); err == nil {
@@ -99,7 +101,7 @@ func TestDeadlinesComeFromCoursesBeforeCalendar(t *testing.T) {
 	}
 
 	client := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/d2l/api/le/1.80")
+		path := strings.TrimPrefix(r.URL.Path, "/d2l/api/le/"+config.LEVersion)
 		body, ok := routes[path]
 		if !ok {
 			t.Errorf("unexpected request %s", r.URL.Path)

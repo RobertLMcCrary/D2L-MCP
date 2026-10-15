@@ -19,4 +19,12 @@
 - `d2l_download_module`: recursively download module file topics
 - `d2l_download_topic`: download one topic file
 
+With `d2l-mcp setup --enable-writes`:
+
+- `d2l_submit_assignment`: upload files to an assignment folder
+- `d2l_post_discussion` / `d2l_edit_discussion_post` / `d2l_delete_discussion_post`: discussion posts
+- `d2l_set_discussion_post_state`: read, flag, rating
+- `d2l_update_content_progress`: mark a content topic read or completed
+- `lms_api_write`: other documented `/d2l/api/` mutations
+
 Run standalone setup and authentication with `d2l-mcp setup`, `d2l-mcp login`, and `d2l-mcp doctor`.

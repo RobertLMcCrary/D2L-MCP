@@ -1,11 +1,11 @@
 # D2L Brightspace Academic Data
 
-This server provides read-only Brightspace academic data through typed MCP tools.
+This server provides Brightspace academic data through typed MCP tools. It is read-only unless the user enabled writes.
 
 ## Agent defaults
 
 1. Call `d2l_status` when configuration or authentication state is unclear.
-2. Use only read-only Brightspace tools. Never submit work, post discussions, alter grades or settings, mark content read/complete, or upload files.
+2. Write tools (`d2l_submit_assignment`, discussion post tools, `d2l_update_content_progress`, `lms_api_write`) exist only when the user enabled writes. Use them only when the user explicitly asks for that specific action, confirm the target and files first, and never retry a failed write automatically.
 3. Browser automation is only for authentication. Retrieve course data through the Brightspace API tools.
 4. Course selectors accept fuzzy names, codes, and numeric org-unit IDs. If a result is ambiguous, list courses and retry with the numeric ID.
 5. Fetch `d2l_get_syllabus` before answering questions about grading weights, policies, prerequisites, or instructor rules.

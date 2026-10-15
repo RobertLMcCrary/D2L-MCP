@@ -79,6 +79,7 @@ func (s *Service) Client(ctx context.Context) (*d2l.Client, *d2l.Resolver, error
 	if err != nil {
 		return nil, nil, err
 	}
+	client.WithWrites(s.Config.EnableWrites)
 
 	s.token = token
 	s.client = client

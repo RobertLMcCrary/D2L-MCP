@@ -135,6 +135,9 @@ func (data DownloadData) Artifacts() []lms.FileArtifact {
 
 func New(service *app.Service) *server.MCPServer {
 	name, instructions := "D2L Brightspace", guidance.Instructions
+	if service.Config.EnableWrites {
+		instructions = guidance.WriteInstructions
+	}
 	if service.Config.Provider == "canvas" {
 		name = "Canvas LMS"
 		instructions = canvasInstructions
@@ -153,6 +156,7 @@ func New(service *app.Service) *server.MCPServer {
 		registerCanvasTools(s, service)
 	} else {
 		registerTools(s, service)
+		registerD2LWrites(s, service)
 		registerResources(s)
 		registerPrompts(s)
 	}

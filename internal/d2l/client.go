@@ -31,6 +31,7 @@ type Client struct {
 	lpVersion  string
 	leVersion  string
 	maxRetries int
+	writes     bool
 }
 
 func NewClient(host, token string) (*Client, error) {
@@ -112,7 +113,9 @@ func (c *Client) Download(ctx context.Context, path string) (*http.Response, err
 	return c.request(ctx, path, nil)
 }
 
-func (c *Client) request(ctx context.Context, path string, query url.Values) (*http.Response, error) {
+// apiURL resolves a Valence API path on the configured host. Reads and
+// writes share these checks.
+func (c *Client) apiURL(path string, query url.Values) (*url.URL, error) {
 	if !strings.HasPrefix(path, "/d2l/api/") {
 		return nil, &Error{Code: ErrConfig, Message: "Refusing a non-Valence API path."}
 	}
@@ -125,6 +128,15 @@ func (c *Client) request(ctx context.Context, path string, query url.Values) (*h
 		return nil, &Error{Code: ErrConfig, Message: "Refusing a non-Valence API path."}
 	}
 	u.RawQuery = query.Encode()
+
+	return u, nil
+}
+
+func (c *Client) request(ctx context.Context, path string, query url.Values) (*http.Response, error) {
+	u, err := c.apiURL(path, query)
+	if err != nil {
+		return nil, err
+	}
 
 	for attempt := 0; attempt < c.maxRetries; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
