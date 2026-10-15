@@ -33,6 +33,10 @@ Setup options:
 | `--tool-profile full\|compact` | `full` registers one tool per operation; `compact` registers core reads plus discovery tools |
 | `--enable-writes` | Register mutation tools. Off by default; `--enable-writes=false` turns it off |
 
+An agent with shell access can also run the setup command when you ask it to "enable
+writes": `lms_status` reports the exact command as `writes.enable_command`. Reconnect the
+MCP server afterwards so the write tools load.
+
 Environment overrides: `LMS_PROVIDER`, `CANVAS_HOST` (implies `canvas`), `CANVAS_TOKEN`,
 `LMS_DOWNLOAD_DIR`, and `LMS_STATE_DIR` (default `~/.d2l`).
 

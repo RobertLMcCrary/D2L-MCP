@@ -271,6 +271,9 @@ func TestD2LWriteToolsRequireEnableWrites(t *testing.T) {
 		if writes != strings.Contains(initialized.Instructions, "writes enabled") {
 			t.Errorf("writes=%v instructions = %q", writes, initialized.Instructions)
 		}
+		if !writes && !strings.Contains(initialized.Instructions, "enable_command") {
+			t.Errorf("read-only instructions do not explain how to enable writes: %q", initialized.Instructions)
+		}
 
 		result, err := client.ListTools(t.Context(), mcp.ListToolsRequest{})
 		if err != nil {

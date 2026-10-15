@@ -111,6 +111,7 @@ type Status struct {
 	APIReachable  bool        `json:"api_reachable"`
 	User          d2l.Object  `json:"user,omitempty"`
 	ActiveCourses int         `json:"active_courses,omitempty"`
+	Writes        WriteAccess `json:"writes"`
 	NextStep      string      `json:"next_step,omitempty"`
 	Checks        []Check     `json:"checks"`
 }
@@ -126,6 +127,7 @@ func (s *Service) Status(ctx context.Context, network bool) Status {
 		Configured:   s.Config.LMSHost != "",
 		LMSHost:      s.Config.LMSHost,
 		SyllabusHost: s.Config.SyllabusHost,
+		Writes:       s.WriteAccess(),
 	}
 
 	result.Checks = append(result.Checks, Check{

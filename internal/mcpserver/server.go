@@ -141,6 +141,9 @@ func New(service *app.Service) *server.MCPServer {
 	if service.Config.Provider == "canvas" {
 		name = "Canvas LMS"
 		instructions = canvasInstructions
+		if !service.Config.EnableWrites {
+			instructions += guidance.EnableWritesHint
+		}
 	}
 	s := server.NewMCPServer(
 		name,

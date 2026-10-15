@@ -12,6 +12,11 @@ d2l-mcp setup --enable-writes          # keeps your current school
 d2l-mcp setup --enable-writes=false    # back to read-only
 ```
 
+You can also ask an agent with shell access, such as Claude Code, to "enable writes".
+`d2l_status` reports the exact command for your installation as `writes.enable_command`,
+and the agent runs it after you approve. Reconnect the MCP server afterwards (`/mcp` in
+Claude Code) so the write tools load.
+
 Changing `--school` turns writes off unless `--enable-writes` is passed in the same
 command. Restart your MCP client afterwards so it picks up the new tool list.
 
