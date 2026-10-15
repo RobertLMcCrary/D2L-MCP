@@ -105,7 +105,8 @@ func registerD2LWrites(s *server.MCPServer, service *app.Service) {
 
 	addTool(s, "d2l_post_discussion",
 		"Start a discussion thread or reply to a post, optionally with attachments. Only post text the user wrote or "+
-			"approved. Group-type topics are not supported by the API.",
+			"approved. Checks the forum and topic first: locked, hidden, group, closed or anonymous-not-allowed topics "+
+			"return NOT_ALLOWED with the reason and nothing is posted.",
 		CreatePostInput{}, Output[d2l.Object]{}, writeAnnotations(),
 		func(ctx context.Context, input CreatePostInput) (d2l.Object, error) {
 			client, t, err := target(ctx, input.PostLocation)
@@ -152,7 +153,8 @@ func registerD2LWrites(s *server.MCPServer, service *app.Service) {
 		})
 
 	addTool(s, "d2l_set_discussion_post_state",
-		"Mark a discussion post read or unread, flag or unflag it, or set your 1-5 rating (0 clears it).",
+		"Mark a discussion post read or unread, flag or unflag it, or set your 1-5 rating (0 clears it). Ratings are "+
+			"checked against the topic's rating settings first.",
 		PostStateInput{}, Output[map[string]any]{}, writeAnnotations(),
 		func(ctx context.Context, input PostStateInput) (map[string]any, error) {
 			client, t, err := target(ctx, input.PostLocation)

@@ -188,9 +188,20 @@ func writeError(resp *http.Response) error {
 		return nil
 	}
 
+	// responseError's wording is written for reads ("denied access to this
+	// item"). For a write, a 403 means a course setting or role permission
+	// blocked the action, and Brightspace does not say which one.
 	apiErr := AsError(err)
-	if apiErr.Code == ErrRateLimited {
+	switch apiErr.Code {
+	case ErrRateLimited:
 		apiErr.Message = "Brightspace rate-limited the write; it was not retried."
+	case ErrForbidden:
+		apiErr.Message = "Brightspace refused this action; the course settings or your role do not allow it."
+		apiErr.NextStep = "Check the item's settings with the read tools. Brightspace does not report which permission blocked it; do not retry."
+	case ErrInvalidResponse:
+		if resp.StatusCode == http.StatusBadRequest {
+			apiErr.Message = "Brightspace rejected the request as invalid (HTTP 400)."
+		}
 	}
 	if detail := readDetail(resp.Body); detail != "" {
 		apiErr.Details = append(apiErr.Details, detail)

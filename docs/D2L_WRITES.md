@@ -36,6 +36,23 @@ Availability dates are left to Brightspace, because special access can reopen a 
 for one student. After submitting, it reads your submissions back so you can confirm
 the files arrived. It marks the result `late` when the due date has passed.
 
+## Instructor restrictions
+
+Brightspace enforces course settings and role permissions itself. The tools surface them
+in two ways:
+
+- **Checked before sending.** These are refused with code `NOT_ALLOWED` and a specific
+  reason, and nothing is sent:
+  - Posting: locked or hidden forum or topic, a group topic, anonymous posting not
+    allowed, or outside the topic's dates or the forum's posting period.
+  - Rating: ratings turned off, a votes-only topic, or `CanRate: false`.
+  - Submitting: hidden folder, wrong submission type, or a group mismatch.
+- **Reported by Brightspace.** Role permissions such as "edit own posts" or "delete own
+  posts", special access, and edit windows aren't exposed by the API. When they block a
+  write, the tool returns `FORBIDDEN` with "the course settings or your role do not
+  allow it". Brightspace doesn't say which permission blocked it, so the agent should
+  report it rather than retry.
+
 ## What the API cannot do
 
 - **Quizzes:** there is no learner route to start, answer or submit a quiz attempt.

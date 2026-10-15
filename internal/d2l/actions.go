@@ -178,12 +178,20 @@ func (c *Client) CreatePost(ctx context.Context, t PostTarget, p NewPost) (Objec
 	if strings.TrimSpace(p.Message) == "" {
 		return nil, lms.Invalid("A post message is required")
 	}
-
 	subject := strings.TrimSpace(p.Subject)
+	if subject == "" && p.ParentPostID == nil {
+		return nil, lms.Invalid("A new thread needs a subject")
+	}
+
+	rules, err := c.discussionRules(ctx, t)
+	if err != nil {
+		return nil, err
+	}
+	if reason := rules.postingBlocked(time.Now(), p.Anonymous); reason != "" {
+		return nil, notAllowed(reason)
+	}
+
 	if subject == "" {
-		if p.ParentPostID == nil {
-			return nil, lms.Invalid("A new thread needs a subject")
-		}
 		var parent Object
 		if err := c.Get(ctx, t.path(c, strconv.FormatInt(*p.ParentPostID, 10)), nil, &parent); err != nil {
 			return nil, err
@@ -262,6 +270,9 @@ func (c *Client) SetPostState(ctx context.Context, t PostTarget, postID int64, s
 	if s.Rating != nil {
 		if *s.Rating < 0 || *s.Rating > 5 {
 			return nil, lms.Invalid("rating must be 0 to 5")
+		}
+		if err := c.checkRating(ctx, t, id); err != nil {
+			return nil, err
 		}
 		changes = append(changes, change{"rating", id + "/Rating/MyRating", map[string]int{"Rating": *s.Rating}})
 	}

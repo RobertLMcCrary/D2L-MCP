@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -244,9 +245,99 @@ func TestGroupSubmitUsesGroupRoute(t *testing.T) {
 	}
 }
 
+// withDiscussionRules serves the forum and topic reads that precede every
+// post or rating, then hands other requests to next.
+func withDiscussionRules(forum, topic string, next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parent := pathpkg.Base(pathpkg.Dir(r.URL.Path))
+		switch {
+		case r.Method == "GET" && parent == "forums":
+			_, _ = w.Write([]byte(forum))
+		case r.Method == "GET" && parent == "topics":
+			_, _ = w.Write([]byte(topic))
+		default:
+			next(w, r)
+		}
+	})
+}
+
+const (
+	openForum = `{"ForumId":2,"IsLocked":false,"IsHidden":false,"StartDate":null,"EndDate":null,"PostStartDate":null,"PostEndDate":null}`
+	openTopic = `{"TopicId":3,"Name":"Normalization","IsLocked":false,"IsHidden":false,"AllowAnonymousPosts":false,"GroupTypeId":null,"RatingType":1}`
+)
+
+func TestPostingRestrictionsAreExplainedBeforeSending(t *testing.T) {
+	past := FormatTime(time.Now().Add(-time.Hour))
+	future := FormatTime(time.Now().Add(time.Hour))
+
+	cases := []struct {
+		name, forum, topic string
+		anonymous          bool
+		want               string
+	}{
+		{"locked forum", `{"IsLocked":true}`, openTopic, false, "forum is locked"},
+		{"locked topic", openForum, `{"Name":"T","IsLocked":true}`, false, "is locked"},
+		{"hidden topic", openForum, `{"Name":"T","IsHidden":true}`, false, "hidden"},
+		{"group topic", openForum, `{"Name":"T","GroupTypeId":5}`, false, "group topic"},
+		{"anonymous not allowed", openForum, openTopic, true, "anonymous"},
+		{"topic not open yet", openForum, `{"Name":"T","StartDate":"` + future + `"}`, false, "opens"},
+		{"topic closed", openForum, `{"Name":"T","EndDate":"` + past + `"}`, false, "closed"},
+		{"forum posting period over", `{"PostEndDate":"` + past + `"}`, openTopic, false, "forum posting period closed"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := writeClient(t, withDiscussionRules(tc.forum, tc.topic, func(_ http.ResponseWriter, r *http.Request) {
+				t.Errorf("%s sent %s %s", tc.name, r.Method, r.URL.Path)
+			}))
+			_, err := client.CreatePost(t.Context(), PostTarget{CourseID: 1, ForumID: 2, TopicID: 3},
+				NewPost{Subject: "Q", Message: "hi", Anonymous: tc.anonymous})
+			apiErr := AsError(err)
+			if apiErr.Code != "NOT_ALLOWED" || !strings.Contains(apiErr.Message, tc.want) {
+				t.Fatalf("err = %v, want NOT_ALLOWED mentioning %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestRatingRestrictionsAreExplainedBeforeSending(t *testing.T) {
+	cases := []struct{ name, topic, post, want string }{
+		{"ratings off", `{"RatingType":0}`, `{"CanRate":true}`, "turned off"},
+		{"votes topic", `{"RatingType":2}`, `{"CanRate":true}`, "up/down votes"},
+		{"cannot rate post", `{"RatingType":1}`, `{"CanRate":false}`, "cannot rate"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := writeClient(t, withDiscussionRules(openForum, tc.topic, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" {
+					t.Errorf("rating sent despite %s", tc.name)
+					return
+				}
+				_, _ = w.Write([]byte(tc.post))
+			}))
+			rating := 3
+			_, err := client.SetPostState(t.Context(), PostTarget{CourseID: 1, ForumID: 2, TopicID: 3}, 4, PostState{Rating: &rating})
+			if apiErr := AsError(err); apiErr.Code != "NOT_ALLOWED" || !strings.Contains(apiErr.Message, tc.want) {
+				t.Fatalf("err = %v, want NOT_ALLOWED mentioning %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestForbiddenWriteSaysPermissionNotAccess(t *testing.T) {
+	client := writeClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+
+	err := AsError(client.DeletePost(t.Context(), PostTarget{CourseID: 1, ForumID: 2, TopicID: 3}, 4))
+	if err.Code != ErrForbidden || !strings.Contains(err.Message, "course settings or your role") || !strings.Contains(err.NextStep, "do not retry") {
+		t.Fatalf("err = %+v", err)
+	}
+}
+
 func TestReplyWithoutSubjectReusesParent(t *testing.T) {
 	topic := PostTarget{CourseID: 7, ForumID: 2, TopicID: 3}
-	client := writeClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	client := writeClient(t, withDiscussionRules(openForum, openTopic, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" {
 			_, _ = w.Write([]byte(`{"PostId":5,"Subject":"Normalization question"}`))
 			return
@@ -282,7 +373,7 @@ func TestNewThreadNeedsSubject(t *testing.T) {
 
 func TestPostAttachmentsUseNumberedParts(t *testing.T) {
 	root := managedFile(t, "er.png", "png")
-	client := writeClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	client := writeClient(t, withDiscussionRules(openForum, openTopic, func(w http.ResponseWriter, r *http.Request) {
 		parts := readMixed(t, r)
 		if len(parts) != 2 || !strings.Contains(parts[1].header.Get("Content-Disposition"), `name="file 0"`) {
 			t.Errorf("parts = %+v", parts)
@@ -317,7 +408,11 @@ func TestUpdatePostSendsSinglePartMultipart(t *testing.T) {
 }
 
 func TestSetPostStateReportsPartialProgress(t *testing.T) {
-	client := writeClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	client := writeClient(t, withDiscussionRules(openForum, openTopic, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			_, _ = w.Write([]byte(`{"PostId":4,"CanRate":true}`))
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, "/Rating/MyRating") {
 			w.WriteHeader(http.StatusBadRequest)
 			return
