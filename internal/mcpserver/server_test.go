@@ -184,6 +184,9 @@ func rejectNonObjectSchemaNodes(t *testing.T, tool, path string, value any) {
 	case nil:
 		t.Errorf("%s %s is null", tool, path)
 	case map[string]any:
+		if isByteArraySchema(node) {
+			t.Errorf("%s %s is a byte array; json.RawMessage values marshal as arbitrary JSON", tool, path)
+		}
 		for key, child := range node {
 			if key == "additionalProperties" && child == false {
 				continue
@@ -239,5 +242,60 @@ func TestGuidanceResourcesAndPrompts(t *testing.T) {
 
 	if len(prompts.Prompts) != 3 {
 		t.Fatalf("got %d prompts, want 3", len(prompts.Prompts))
+	}
+}
+
+func TestD2LWriteToolsRequireEnableWrites(t *testing.T) {
+	writeTools := []string{
+		"d2l_submit_assignment", "d2l_post_discussion", "d2l_edit_discussion_post",
+		"d2l_delete_discussion_post", "d2l_set_discussion_post_state", "d2l_update_content_progress", "lms_api_write",
+	}
+
+	for _, writes := range []bool{false, true} {
+		service := &app.Service{Config: config.Config{EnableWrites: writes}, Paths: config.Paths{Dir: t.TempDir()}}
+		client, err := mcpclient.NewInProcessClient(New(service))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = client.Close() })
+		if err := client.Start(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		request := mcp.InitializeRequest{}
+		request.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+		request.Params.ClientInfo = mcp.Implementation{Name: "test", Version: "1"}
+		initialized, err := client.Initialize(t.Context(), request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if writes != strings.Contains(initialized.Instructions, "writes enabled") {
+			t.Errorf("writes=%v instructions = %q", writes, initialized.Instructions)
+		}
+		if !writes && !strings.Contains(initialized.Instructions, "enable_command") {
+			t.Errorf("read-only instructions do not explain how to enable writes: %q", initialized.Instructions)
+		}
+
+		result, err := client.ListTools(t.Context(), mcp.ListToolsRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tools := map[string]mcp.Tool{}
+		for _, tool := range result.Tools {
+			tools[tool.Name] = tool
+			assertClientSchema(t, tool.Name+".input", mcp.ToolArgumentsSchema(tool.InputSchema))
+			assertClientSchema(t, tool.Name+".output", mcp.ToolArgumentsSchema(tool.OutputSchema))
+		}
+		for _, name := range writeTools {
+			tool, ok := tools[name]
+			if ok != writes {
+				t.Errorf("writes=%v: %s registered=%v", writes, name, ok)
+			}
+			if ok && (tool.Annotations.ReadOnlyHint == nil || *tool.Annotations.ReadOnlyHint) {
+				t.Errorf("%s is annotated read-only", name)
+			}
+		}
+		if delete := tools["d2l_delete_discussion_post"]; writes && (delete.Annotations.DestructiveHint == nil || !*delete.Annotations.DestructiveHint) {
+			t.Error("d2l_delete_discussion_post is not annotated destructive")
+		}
 	}
 }

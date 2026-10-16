@@ -26,6 +26,7 @@ type ProviderStatus struct {
 	TokenPresent bool             `json:"token_present"`
 	APIReachable bool             `json:"api_reachable"`
 	Capabilities lms.Capabilities `json:"capabilities"`
+	Writes       WriteAccess      `json:"writes"`
 	User         any              `json:"user,omitempty"`
 	NextStep     string           `json:"next_step,omitempty"`
 }
@@ -35,7 +36,7 @@ func (s *Service) ProviderStatus(ctx context.Context, network bool) ProviderStat
 	if name == "" {
 		name = "d2l"
 	}
-	result := ProviderStatus{Provider: name, Host: s.Config.LMSHost, Configured: s.Config.LMSHost != ""}
+	result := ProviderStatus{Provider: name, Host: s.Config.LMSHost, Configured: s.Config.LMSHost != "", Writes: s.WriteAccess()}
 	if !result.Configured {
 		result.NextStep = "Run setup --provider " + name + " --host https://your-school.example"
 		return result

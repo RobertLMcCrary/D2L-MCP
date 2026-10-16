@@ -70,3 +70,35 @@ func TestCanvasSetupAndOpaqueAuthenticationConfiguration(t *testing.T) {
 		t.Fatal("Canvas attempted Brightspace browser login")
 	}
 }
+
+func TestBrightspaceWritesSurviveOnlyExplicitPresetChanges(t *testing.T) {
+	t.Setenv("LMS_STATE_DIR", t.TempDir())
+	t.Setenv("CANVAS_HOST", "")
+	t.Setenv("LMS_PROVIDER", "")
+	paths, err := config.DefaultPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	load := func() config.Config {
+		t.Helper()
+		cfg, err := config.Load(paths)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+
+	if err := setup([]string{"--school", "ksu", "--enable-writes"}); err != nil {
+		t.Fatal(err)
+	}
+	if cfg := load(); cfg.Provider != "d2l" || !cfg.EnableWrites {
+		t.Fatalf("explicit --enable-writes with a preset was dropped: %+v", cfg)
+	}
+
+	if err := setup([]string{"--school", "gsu"}); err != nil {
+		t.Fatal(err)
+	}
+	if load().EnableWrites {
+		t.Fatal("switching schools carried write access over")
+	}
+}

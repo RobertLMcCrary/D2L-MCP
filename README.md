@@ -10,7 +10,7 @@ Brightspace usage below remains compatible.
 [![Go version](https://img.shields.io/github/go-mod/go-version/RobertLMcCrary/D2L-MCP)](go.mod)
 [![License](https://img.shields.io/github/license/RobertLMcCrary/D2L-MCP)](LICENSE)
 
-A local [Model Context Protocol](https://modelcontextprotocol.io/) server for read-only D2L Brightspace academic data. It runs over stdio and is written in Go with [mark3labs/mcp-go](https://github.com/mark3labs/mcp-go).
+A local [Model Context Protocol](https://modelcontextprotocol.io/) server for D2L Brightspace academic data: read-only by default, with opt-in assignment submission and discussion writes. It runs over stdio and is written in Go with [mark3labs/mcp-go](https://github.com/mark3labs/mcp-go).
 
 > [!IMPORTANT]
 > D2L MCP is unofficial. It is not affiliated with or endorsed by D2L Corporation or any educational institution.
@@ -18,15 +18,16 @@ A local [Model Context Protocol](https://modelcontextprotocol.io/) server for re
 ## Features
 
 - Courses, identity, grades, assignments, quizzes, discussions, and announcements
-- Calendar, due and overdue work, recent updates, and course snapshots
+- Deadlines built from each course's assignments, quizzes and content, plus calendar, due and overdue work, recent updates, and course snapshots
 - Course-content browsing by root, table of contents, or module
 - Individual and recursive downloads for course materials
 - Assignment-attachment downloads
 - Public SimpleSyllabus retrieval
 - Browser-assisted Brightspace login and silent token refresh
+- Opt-in writes: submit assignments, post and manage discussion replies, mark content progress ([docs/D2L_WRITES.md](docs/D2L_WRITES.md))
 - Typed MCP inputs, structured outputs, guidance resources, and workflow prompts
 
-Brightspace academic access is GET-only. Authentication performs a token-exchange POST inside the user's authenticated browser session. Downloads write only to a managed local directory.
+Brightspace academic access is GET-only unless you run `setup --enable-writes`. Authentication performs a token-exchange POST inside the user's authenticated browser session. Downloads write only to a managed local directory.
 
 ## Project status
 
@@ -135,6 +136,7 @@ Read-only query tools:
 - `d2l_get_discussions`
 - `d2l_get_content`
 - `d2l_get_announcements`
+- `d2l_get_deadlines`
 - `d2l_get_calendar`
 - `d2l_get_due`
 - `d2l_get_overdue`
@@ -148,11 +150,19 @@ Local-writing download tools:
 - `d2l_download_module`
 - `d2l_download_topic`
 
+Write tools, registered only after `d2l-mcp setup --enable-writes` (see [docs/D2L_WRITES.md](docs/D2L_WRITES.md)):
+
+- `d2l_submit_assignment`
+- `d2l_post_discussion`, `d2l_edit_discussion_post`, `d2l_delete_discussion_post`
+- `d2l_set_discussion_post_state`
+- `d2l_update_content_progress`
+- `lms_api_write`
+
 Downloads default to `~/.d2l/downloads`. Set `D2L_DOWNLOAD_DIR` or `download_dir` in `config.json` to use another managed root. Existing files are never overwritten.
 
 ## Security
 
-- Academic API calls are GET-only.
+- Academic API calls are GET-only unless writes are enabled; writes are never retried and never follow redirects.
 - HTTPS Brightspace hosts are required.
 - Bearer credentials are not forwarded across host redirects.
 - Tokens use mode `0600`; state directories use `0700` on supported systems.

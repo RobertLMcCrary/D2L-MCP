@@ -14,7 +14,7 @@ import (
 
 const (
 	LPVersion  = "1.47"
-	LEVersion  = "1.80"
+	LEVersion  = "1.82"
 	BASVersion = "2.2"
 
 	UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
@@ -122,9 +122,6 @@ func Validate(cfg *Config, allowPrivate bool) error {
 	}
 	if cfg.Provider != "d2l" && cfg.Provider != "canvas" {
 		return fmt.Errorf("unsupported LMS provider %q", cfg.Provider)
-	}
-	if cfg.Provider == "d2l" && cfg.EnableWrites {
-		return errors.New("Brightspace academic writes are not supported")
 	}
 	var err error
 	cfg.LMSHost, err = NormalizeHost(cfg.LMSHost, allowPrivate)

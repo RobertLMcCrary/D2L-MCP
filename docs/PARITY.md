@@ -12,7 +12,7 @@ This server ports the academic behavior of [Aaryan Kapoor’s `d2l-cli` v0.2.2](
 - `discussions` → `d2l_get_discussions`
 - `content` and `content --toc` → `d2l_get_content`
 - `news` → `d2l_get_announcements`
-- `calendar` → `d2l_get_calendar`
+- `calendar` → `d2l_get_calendar` (deadlines: `d2l_get_deadlines`)
 - `due` → `d2l_get_due`
 - `overdue` → `d2l_get_overdue`
 - `updates` → `d2l_get_updates`

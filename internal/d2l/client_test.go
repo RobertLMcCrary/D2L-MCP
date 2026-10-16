@@ -100,3 +100,28 @@ func TestResponseCodesAreTyped(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, ErrForbidden)
 	}
 }
+
+func TestDroppedConnectionIsRetried(t *testing.T) {
+	var calls atomic.Int32
+	client := testClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if calls.Add(1) == 1 {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = conn.Close()
+
+			return
+		}
+
+		_, _ = w.Write([]byte(`{"Identifier":"student"}`))
+	}))
+
+	if _, err := client.WhoAmI(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if calls.Load() != 2 {
+		t.Fatalf("got %d calls, want 2", calls.Load())
+	}
+}

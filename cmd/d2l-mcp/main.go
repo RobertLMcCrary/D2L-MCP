@@ -94,7 +94,7 @@ func setup(args []string) error {
 	host := flags.String("host", "", "LMS HTTPS host")
 	provider := flags.String("provider", "", "LMS provider: d2l or canvas")
 	toolProfile := flags.String("tool-profile", "", "Canvas tool catalog: full or compact (discover and invoke operations)")
-	enableWrites := flags.Bool("enable-writes", false, "Enable Canvas academic writes")
+	enableWrites := flags.Bool("enable-writes", false, "Enable academic writes (submissions, posts, messages)")
 	syllabusHost := flags.String("syllabus-host", "", "SimpleSyllabus HTTPS host")
 	schoolName := flags.String("school", "", "School preset: ksu or gsu")
 	show := flags.Bool("show", false, "Show current configuration")
@@ -130,8 +130,10 @@ func setup(args []string) error {
 	if *toolProfile != "" {
 		current.ToolProfile = *toolProfile
 	}
+	writesSet := false
 	flags.Visit(func(f *flag.Flag) {
 		if f.Name == "enable-writes" {
+			writesSet = true
 			current.EnableWrites = *enableWrites
 		}
 	})
@@ -146,7 +148,10 @@ func setup(args []string) error {
 		}
 		current.School, current.LMSHost, current.SyllabusHost = preset.Name, preset.LMSHost, preset.SyllabusHost
 		current.Provider = "d2l"
-		current.EnableWrites = false
+		// Switching schools must not silently carry over write access.
+		if !writesSet {
+			current.EnableWrites = false
+		}
 	}
 
 	if *host != "" {
@@ -273,7 +278,7 @@ func usage() {
 
   serve    Start the local stdio MCP server (default)
   setup    Configure --provider d2l|canvas and --host HTTPS_ORIGIN
-           Canvas: --enable-writes and --tool-profile full|compact
+           --enable-writes for submissions and posts; Canvas: --tool-profile full|compact
   login    Brightspace browser login; Canvas: --token-stdin (or CANVAS_TOKEN)
   doctor   Print structured setup and API diagnostics
   version  Print the server version`)
